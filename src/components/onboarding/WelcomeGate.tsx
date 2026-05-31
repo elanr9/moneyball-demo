@@ -79,8 +79,7 @@ function WelcomeScreen({ onStart }: { onStart: () => void }) {
             className="fv-welcome-rise mt-4 max-w-sm text-[15px] leading-relaxed text-slate-400"
             style={{ animationDelay: '0.25s' }}
           >
-            The scouting brain for college soccer. Calm, fast and built to help you
-            see the whole game.
+            AI Money Ball
           </p>
         ) : null}
 
