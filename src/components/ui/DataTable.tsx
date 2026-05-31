@@ -90,7 +90,7 @@ export function DataTable<T>({
                     col.align !== 'right' &&
                       col.align !== 'center' &&
                       'text-left',
-                    col.sortable && 'cursor-pointer select-none hover:text-white',
+                    col.sortable && 'cursor-pointer select-none hover:text-ink-100',
                     col.sticky && 'sticky left-0 bg-navy-700 z-20',
                   )}
                 >

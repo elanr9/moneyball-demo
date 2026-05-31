@@ -16,7 +16,7 @@ export function EmptyState({ icon: Icon, title, description }: EmptyStateProps) 
           className="mx-auto mb-4 text-ink-300"
         />
       ) : null}
-      <div className="text-base font-semibold text-white mb-2">{title}</div>
+      <div className="text-base font-semibold text-ink-100 mb-2">{title}</div>
       {description ? (
         <div className="text-sm text-ink-300 max-w-md mx-auto">
           {description}

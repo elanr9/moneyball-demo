@@ -5,7 +5,6 @@ interface PlayerAvatarProps {
   name: string
   size?: 'sm' | 'md' | 'lg' | 'xl'
   ringColor?: string
-  photoUrl?: string
 }
 
 const SIZE_STYLES: Record<NonNullable<PlayerAvatarProps['size']>, string> = {
@@ -15,30 +14,17 @@ const SIZE_STYLES: Record<NonNullable<PlayerAvatarProps['size']>, string> = {
   xl: 'w-[180px] h-[180px] text-5xl',
 }
 
-export function PlayerAvatar({
-  name,
-  size = 'md',
-  ringColor,
-  photoUrl,
-}: PlayerAvatarProps) {
+export function PlayerAvatar({ name, size = 'md', ringColor }: PlayerAvatarProps) {
   const initials = getInitials(name)
   return (
     <div
       className={clsx(
-        'rounded-full bg-navy-700 text-blue-400 font-semibold flex items-center justify-center shrink-0 overflow-hidden',
+        'rounded-full bg-navy-700 text-blue-500 font-semibold flex items-center justify-center shrink-0 overflow-hidden',
         SIZE_STYLES[size],
-        ringColor ?? 'border border-blue-500',
+        ringColor ?? 'border border-navy-600',
       )}
     >
-      {photoUrl ? (
-        <img
-          src={photoUrl}
-          alt={name}
-          className="w-full h-full object-cover"
-        />
-      ) : (
-        initials
-      )}
+      {initials}
     </div>
   )
 }

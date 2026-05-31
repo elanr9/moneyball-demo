@@ -1,6 +1,10 @@
-# FieldVision AI Moneyball Demo
+# FieldVision — AI Moneyball for Soccer
 
-A pitch deck demo for the FieldVision AI Moneyball platform built for Brandeis Sparktank 2026. React + TypeScript + Vite + Tailwind. Dark navy theme. Two modes that share one database.
+FieldVision turns game and training film into the world's first global soccer
+database, then puts it inside a scouting and team management platform that feels
+like FIFA Ultimate Team for coaches. This repo is the Y Combinator demo.
+
+React 18 + TypeScript (strict) + Vite + Tailwind + React Router. Dark navy theme.
 
 ## Run
 
@@ -9,28 +13,30 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 (or whatever port Vite picks). The app loads in Coach Mode by default. Use the toggle in the sidebar to switch to Scout Mode.
-
 ## Build
 
 ```bash
-npm run build
-npm run preview
+npm run build   # runs tsc -b then vite build, must stay green
 ```
 
-## Data
+## How this is built
 
-`public/data/Brandeis-Soccer-FieldVision-Data.xlsx` is parsed once at app mount and held in React Context. Three sheets: Roster (29 players), Season Stats (38 KPIs per player), Per Game Elan Romo (18 games).
+The work is split into phases. Start here:
 
-## Demo flow
+- `PLAN.md` — the product vision, scope, conventions, and phase list.
+- `DATA_ENGINE.md` — the Phase 1 data engine API (everything renders from it).
+- `phases/PHASE_2.md` … `phases/PHASE_5.md` — copy/paste prompts to build each
+  remaining phase in a fresh agent.
 
-1. Coach Dashboard (hero stats + recent games + roster spotlight + upload dropzone)
-2. Roster (full table, sortable, filter by position)
-3. Player profile for Elan Romo (5 stat groups, FieldVision-only highlights in green)
-4. Per Game tab (full season breakdown)
-5. Highlights tab (auto generated clip grid)
-6. Toggle to Scout Mode
-7. Search "Forward under 22 with high xG and progressive runs"
-8. View results, click through to player profile
-9. Database (38 column dense table)
-10. Leaderboard (4 categories)
+### Phase 1 (done): the data universe
+
+`src/data/` deterministically generates the entire demo universe once and caches
+it: 16 NCAA Division III teams (5 with real rosters, 11 generated), ~430 players
+with FIFA style overalls + attributes and a full simulated season of stats
+(including FieldVision exclusive metrics), a 16 game schedule, standings, and an
+8 team postseason. Access it through `useUniverse()`
+(`src/context/UniverseContext.tsx`).
+
+The original single team Brandeis demo (Excel based, `src/context/
+PlayerDataContext.tsx` and friends) still powers the legacy routes and will be
+replaced by universe driven pages across phases 2 to 5.

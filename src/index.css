@@ -3,48 +3,90 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Team identity. Set at runtime from the selected club so every surface can
+       borrow the club's color through var(--team-primary). Defaults to brand. */
+    --team-primary: #3d7dff;
+    --team-soft: rgba(61, 125, 255, 0.14);
+
+    /* Height of the fixed top navigation. Pages anchor sticky sub bars and
+       scroll padding to this single value. */
+    --app-header-h: 4rem;
+  }
+
   html,
   body,
   #root {
     height: 100%;
-    background-color: #0B1A2E;
+    background-color: #070a0f;
+  }
+
+  html {
+    /* Stops sticky headers from guillotining anchored content on scroll. */
+    scroll-padding-top: var(--app-header-h);
   }
 
   body {
     font-family: 'Inter', system-ui, sans-serif;
-    color: #E1E8F0;
+    color: #f3f5fa;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     min-width: 1280px;
   }
 
   ::selection {
-    background-color: #4A99E0;
-    color: #0B1A2E;
+    background-color: #3d7dff;
+    color: #ffffff;
   }
 }
 
 @layer components {
+  /* A true eyebrow label. Use sparingly, only to title a region, never on every
+     small block. */
   .section-label {
-    @apply text-xs uppercase tracking-widest font-semibold;
+    @apply text-[11px] uppercase tracking-widest font-semibold text-ink-500;
+  }
+
+  /* Soft elevated surface used for cards and panels across the product. The
+     hairline top highlight gives a faint sense of being lit from above. */
+  .surface-card {
+    @apply rounded-2xl border border-navy-600 bg-navy-800 shadow-card;
+  }
+
+  /* Recessed inset region, e.g. a field, a chart well or an input. */
+  .surface-inset {
+    @apply rounded-xl border border-navy-600 bg-navy-900;
   }
 
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: #1F4570 transparent;
+    scrollbar-color: #2b3340 transparent;
   }
   .scrollbar-thin::-webkit-scrollbar {
     height: 8px;
     width: 8px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: #1F4570;
+    background-color: #2b3340;
     border-radius: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: #3a4252;
+  }
+}
+
+@layer utilities {
+  /* Tabular figures for stat tables and scores so columns line up. */
+  .nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
   }
 }
 
 @keyframes fv-pulse {
-  0%, 80%, 100% {
+  0%,
+  80%,
+  100% {
     opacity: 0.25;
     transform: scale(0.85);
   }
@@ -56,4 +98,124 @@
 
 .fv-pulse-dot {
   animation: fv-pulse 1.2s ease-in-out infinite;
+}
+
+/* Flows the dashes along a tactical run arrow toward its destination. */
+@keyframes fv-run-dash {
+  to {
+    stroke-dashoffset: -26;
+  }
+}
+
+.fv-run-dash {
+  animation: fv-run-dash 0.7s linear infinite;
+}
+
+/* Welcome screen. A calm, lightly blurred rise so the brand settles onto the
+   white canvas rather than snapping in. Used for the headline and the button. */
+@keyframes fv-welcome-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.fv-welcome-rise {
+  animation: fv-welcome-rise 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* A very slow breathing aura behind the brand. Soft enough to feel like ambient
+   technology, never a spinner or a hard loader. */
+@keyframes fv-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.06);
+  }
+}
+
+.fv-breathe {
+  animation: fv-breathe 5s ease-in-out infinite;
+}
+
+/* A single soft sweep of light across the brand row as the session opens. */
+@keyframes fv-sheen {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+.fv-sheen {
+  animation: fv-sheen 2.6s ease-in-out 0.6s both;
+}
+
+/* Tutorial spotlight ring. A gentle breathing halo around the highlighted part
+   so the eye lands on it without anything aggressive. */
+@keyframes fv-tour-ring {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 9999px rgba(7, 10, 15, 0.74),
+      0 0 0 2px var(--team-primary, #3d7dff),
+      0 0 22px 4px rgba(61, 125, 255, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 9999px rgba(7, 10, 15, 0.74),
+      0 0 0 3px var(--team-primary, #3d7dff),
+      0 0 34px 8px rgba(61, 125, 255, 0.55);
+  }
+}
+
+.fv-tour-ring {
+  animation: fv-tour-ring 2.4s ease-in-out infinite;
+}
+
+/* The little arrow that points from the tutorial card to the highlighted part. */
+@keyframes fv-tour-nudge {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(var(--nudge-x, 0), var(--nudge-y, 0));
+  }
+}
+
+.fv-tour-nudge {
+  animation: fv-tour-nudge 1.3s ease-in-out infinite;
+}
+
+/* The tutorial title and subtitle pop in one after the other each step so the
+   card feels like your analyst is talking to you in real time. */
+@keyframes fv-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.fv-pop-title {
+  animation: fv-pop 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.fv-pop-body {
+  animation: fv-pop 360ms cubic-bezier(0.22, 1, 0.36, 1) 200ms both;
 }

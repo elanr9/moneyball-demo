@@ -14,10 +14,10 @@ const SIZE_STYLES: Record<NonNullable<RatingBadgeProps['size']>, string> = {
 }
 
 const TONE_STYLES: Record<string, string> = {
-  green: 'bg-fv-green text-white',
-  yellow: 'bg-fv-yellow text-navy-900',
-  white: 'bg-navy-700 text-white border border-navy-600',
-  red: 'bg-fv-red text-white',
+  green: 'bg-fv-green text-ink-900',
+  yellow: 'bg-fv-yellow text-ink-900',
+  white: 'bg-navy-700 text-ink-100 border border-navy-600',
+  red: 'bg-fv-red text-ink-900',
 }
 
 export function RatingBadge({ rating, size = 'md' }: RatingBadgeProps) {

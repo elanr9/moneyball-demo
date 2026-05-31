@@ -1,581 +1,500 @@
-import { useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import clsx from 'clsx'
-import { PlayCircle, Calendar } from 'lucide-react'
-import { usePlayerData } from '../../context/PlayerDataContext'
-import { Tabs } from '../../components/ui/Tabs'
-import { StatTile } from '../../components/ui/StatTile'
-import { StatGroup } from '../../components/ui/StatGroup'
-import { RatingBadge } from '../../components/ui/RatingBadge'
-import { PlayerAvatar } from '../../components/ui/PlayerAvatar'
-import { EmptyState } from '../../components/ui/EmptyState'
-import type { Player as PlayerType } from '../../types/player'
-import type { PerGameStats } from '../../types/game'
+// Player profile at /player/:teamId/:slug, used by every other phase. Built on
+// the universe: a FIFA style card, full identity, an attribute radar, season
+// stat groups from STAT_CATALOG, a per match log with an FV rating trend, and an
+// auto generated highlights grid.
 
-const TAB_ITEMS = [
-  { id: 'season', label: 'Season' },
-  { id: 'pergame', label: 'Per Game' },
-  { id: 'highlights', label: 'Highlights' },
-  { id: 'compare', label: 'Compare' },
+import { useMemo, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
+import { ChevronRight, PlayCircle, Sparkles } from 'lucide-react'
+import { useUniverse } from '../../context/UniverseContext'
+import { useRoles } from '../../context/RolesContext'
+import {
+  STAT_CATALOG,
+  getPlayerBySlug,
+  getTeam,
+} from '../../data/selectors'
+import type { StatDef, StatGroup as StatGroupName } from '../../data/selectors'
+import type { Player as PlayerType } from '../../data/types'
+import { buildPercentiles, playerRoleFits } from '../../data/gameModel'
+import type { Percentiles, RoleFit } from '../../data/gameModel'
+import { playerSummary } from '../../data/playerSummary'
+import { reportsFor } from '../../data/scoutReports'
+import { Tabs } from '../../components/ui/Tabs'
+import type { TabItem } from '../../components/ui/Tabs'
+import { StatTile } from '../../components/ui/StatTile'
+import { RatingBadge } from '../../components/ui/RatingBadge'
+import { EmptyState } from '../../components/ui/EmptyState'
+import { PlayerCard } from '../../components/squad/PlayerCard'
+import { AttributeBreakdown } from '../../components/squad/AttributeBreakdown'
+import { TeamCrest } from '../../components/league/TeamCrest'
+import { dateLabel } from '../../components/league/league'
+import { MatchDetailModal } from '../../components/player/MatchDetailModal'
+import { PlayerIndexes } from '../../components/player/PlayerIndexes'
+import { RoleFitGrid } from '../../components/player/RoleFitGrid'
+import { ComparisonList } from '../../components/player/ComparisonList'
+import { ScoutReportsPanel } from '../../components/player/ScoutReportsPanel'
+import { CareerTab } from '../../components/player/CareerTab'
+import type { PlayerMatchStat } from '../../data/types'
+
+const TABS: TabItem[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'statistics', label: 'Statistics' },
+  { id: 'matchlog', label: 'Match Log' },
+  { id: 'reports', label: 'Reports' },
+  { id: 'career', label: 'Career' },
+  { id: 'video', label: 'Video' },
 ]
 
-const POSITION_FULL: Record<string, string> = {
-  GK: 'GOALKEEPER',
-  B: 'DEFENDER',
-  M: 'MIDFIELDER',
-  F: 'FORWARD',
-  'M/B': 'MIDFIELDER / BACK',
-}
-
-const PLAYER_PHOTOS: Record<string, string> = {
-  'elan-romo': '/players/elan-romo.png',
-}
-
-const PLAYER_HIGHLIGHT_VIDEOS: Record<string, string> = {
-  'elan-romo': 'https://www.youtube.com/embed/ZVhHnAVedQE',
-}
+const GROUP_ORDER: StatGroupName[] = [
+  'Attacking',
+  'Passing',
+  'Defending',
+  'Physical',
+  'Advanced',
+  'Goalkeeping',
+]
 
 export function Player() {
-  const { slug } = useParams<{ slug: string }>()
+  const { teamId = '', slug = '' } = useParams()
+  const { universe } = useUniverse()
+  const { roles } = useRoles()
   const navigate = useNavigate()
-  const { getPlayerBySlug, getPerGameForPlayer, players } = usePlayerData()
-  const [tab, setTab] = useState('season')
+  const [tab, setTab] = useState('overview')
 
-  const player = slug ? getPlayerBySlug(slug) : undefined
+  const player = getPlayerBySlug(universe, teamId, slug)
+  const team = player ? getTeam(universe, player.teamId) : undefined
+
+  const percentiles = useMemo(() => buildPercentiles(universe.players), [universe.players])
+  const fits = useMemo(
+    () => (player ? playerRoleFits(player, roles, percentiles) : []),
+    [player, roles, percentiles],
+  )
+  const reportSummary = useMemo(
+    () => (player ? reportsFor(player) : { averageStars: 0, count: 0 }),
+    [player],
+  )
 
   if (!player) {
     return (
       <div className="p-8">
         <EmptyState
           title="Player not found"
-          description="Try going back to the roster."
+          description="This player is not in the league. Try the transfer market or a team page."
         />
       </div>
     )
   }
 
-  const perGame = getPerGameForPlayer(player.slug)
-  const minutesPct = player.gp ? Math.round((player.minutes / 1620) * 100) : 0
-
   return (
-    <div className="p-8 space-y-6 max-w-[1400px] mx-auto">
+    <div className="mx-auto max-w-[1400px] space-y-6 p-8">
       <button
         type="button"
-        onClick={() => navigate('/roster')}
-        className="text-xs text-ink-300 hover:text-white uppercase tracking-widest"
+        onClick={() => navigate(-1)}
+        className="text-xs uppercase tracking-widest text-ink-300 transition-colors hover:text-ink-100"
       >
-        ← Back to Roster
+        Back
       </button>
 
-      <PlayerHeader player={player} minutesPct={minutesPct} />
+      <div data-tour="player-header">
+        <ProfileHeader
+          player={player}
+          team={team}
+          topFit={fits[0]}
+          reportAverage={reportSummary.averageStars}
+          reportCount={reportSummary.count}
+        />
+      </div>
 
-      <Tabs tabs={TAB_ITEMS} active={tab} onChange={setTab} />
+      <div data-tour="player-tabs">
+        <Tabs tabs={TABS} active={tab} onChange={setTab} />
+      </div>
 
-      {tab === 'season' && <SeasonTab player={player} />}
-      {tab === 'pergame' && (
-        <PerGameTab player={player} perGame={perGame} />
-      )}
-      {tab === 'highlights' && (
-        <HighlightsTab videoUrl={PLAYER_HIGHLIGHT_VIDEOS[player.slug]} />
-      )}
-      {tab === 'compare' && (
-        <CompareTab player={player} allPlayers={players} />
-      )}
+      {tab === 'overview' ? (
+        <OverviewTab player={player} fits={fits} percentiles={percentiles} />
+      ) : null}
+      {tab === 'statistics' ? <StatisticsTab player={player} /> : null}
+      {tab === 'matchlog' ? <MatchLogTab player={player} /> : null}
+      {tab === 'reports' ? <ScoutReportsPanel player={player} /> : null}
+      {tab === 'career' ? <CareerTab player={player} /> : null}
+      {tab === 'video' ? <VideoTab player={player} /> : null}
     </div>
   )
 }
 
-function PlayerHeader({
+function ProfileHeader({
   player,
-  minutesPct,
+  team,
+  topFit,
+  reportAverage,
+  reportCount,
 }: {
   player: PlayerType
-  minutesPct: number
+  team: ReturnType<typeof getTeam>
+  topFit: RoleFit | undefined
+  reportAverage: number
+  reportCount: number
 }) {
+  const identity: Array<{ label: string; value: string }> = [
+    { label: 'Position', value: player.primaryPosition },
+  ]
+  if (player.secondaryPositions.length > 0) {
+    identity.push({
+      label: 'Also Plays',
+      value: player.secondaryPositions.join('  '),
+    })
+  }
+  identity.push(
+    { label: 'Number', value: `#${player.number}` },
+    { label: 'Class', value: player.classYear },
+    { label: 'Age', value: String(player.age) },
+    { label: 'Foot', value: player.foot === 'L' ? 'Left' : 'Right' },
+  )
+  if (player.heightLabel) identity.push({ label: 'Height', value: player.heightLabel })
+  if (player.weightLbs) identity.push({ label: 'Weight', value: `${player.weightLbs} lbs` })
+  if (player.hometown) identity.push({ label: 'Hometown', value: player.hometown })
+  if (player.country) identity.push({ label: 'Country', value: player.country })
+  if (player.previousSchool) identity.push({ label: 'Previous', value: player.previousSchool })
+
   return (
-    <section className="bg-navy-800 rounded-lg border border-navy-600 p-8">
-      <div className="flex items-center gap-8">
-        <PlayerAvatar
-          name={player.name}
-          size="xl"
-          photoUrl={PLAYER_PHOTOS[player.slug]}
-        />
-        <div className="flex-1 min-w-0">
-          <div className="text-xs uppercase tracking-widest text-blue-500 mb-2">
-            Player Profile
+    <section
+      className="overflow-hidden rounded-2xl border border-navy-600 bg-navy-800 p-6 shadow-card"
+      style={{ borderLeft: `4px solid ${team?.primaryColor ?? '#2563EB'}` }}
+    >
+      <div className="flex flex-wrap items-start gap-6">
+        <PlayerCard player={player} team={team} size="detail" />
+
+        <div className="min-w-0 flex-1">
+          <div className="section-label text-blue-500">Player Profile</div>
+          <h1 className="text-4xl font-bold tracking-tight text-ink-100">{player.name}</h1>
+          {team ? (
+            <Link
+              to={`/team/${team.id}`}
+              className="mt-2 inline-flex items-center gap-2 text-sm text-ink-100 transition-colors hover:text-blue-500"
+            >
+              <TeamCrest team={team} size="sm" />
+              {team.name}
+            </Link>
+          ) : null}
+
+          <div className="mt-4 flex items-start gap-2 rounded-md border border-navy-600 bg-navy-700/60 p-3">
+            <Sparkles size={14} className="mt-0.5 shrink-0 text-blue-500" />
+            <p className="text-sm leading-relaxed text-ink-100">
+              {playerSummary(player, team?.shortName, topFit)}
+            </p>
           </div>
-          <h1 className="text-4xl font-bold text-white">{player.name}</h1>
-          <div className="text-sm text-ink-300 mt-2">
-            Brandeis Men's Soccer · NCAA Division III · UAA Conference
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <SeasonChip label="Games Played" value={player.season.appearances} />
+            <SeasonChip label="Games Started" value={player.season.starts} />
           </div>
-          <div className="mt-4 flex items-center gap-2 text-sm">
-            <span className="font-mono font-semibold text-blue-400 tracking-widest">
-              {POSITION_FULL[player.position] ?? player.position}
-            </span>
-            <span className="text-ink-500">·</span>
-            <span className="font-mono text-white">#{player.number}</span>
-            <span className="text-ink-500">·</span>
-            <span className="text-ink-300">{player.year}</span>
-            {player.height ? (
-              <>
-                <span className="text-ink-500">·</span>
-                <span className="text-ink-300">{player.height}</span>
-              </>
-            ) : null}
-          </div>
-          <div className="mt-3 text-xs uppercase tracking-widest text-ink-300 font-mono">
-            Min Played · {player.minutes.toLocaleString()} / 1,620 ·{' '}
-            {minutesPct}%
+
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {identity.map((item) => (
+              <div key={item.label} className="rounded-md border border-navy-600 bg-navy-700 p-3">
+                <div className="text-[10px] uppercase tracking-widest text-ink-300">
+                  {item.label}
+                </div>
+                <div className="mt-1 truncate text-sm font-semibold text-ink-100" title={item.value}>
+                  {item.value}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-        <RatingBadge rating={player.fvRating} size="xl" />
+
+        <div className="flex flex-col items-center gap-3">
+          <RatingBadge rating={player.season.fvRating} size="xl" />
+          <div className="flex gap-3">
+            <RatingTile label="Overall" value={player.overall} />
+            <RatingTile label="Potential" value={player.potential} />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 border-t border-navy-600 pt-5">
+        <PlayerIndexes
+          player={player}
+          topFit={topFit}
+          reportAverage={reportAverage}
+          reportCount={reportCount}
+        />
       </div>
     </section>
   )
 }
 
-function SeasonTab({ player }: { player: PlayerType }) {
+function SeasonChip({ label, value }: { label: string; value: number }) {
   return (
-    <div className="space-y-5">
-      <StatGroup title="Top Stats" tone="navy">
-        <StatTile label="Goals" value={player.goals} />
-        <StatTile label="Assists" value={player.assists} />
-        <StatTile label="xG" value={player.xg.toFixed(2)} />
-        <StatTile label="xGOT" value={player.xgOt.toFixed(2)} />
-        <StatTile label="xA" value={player.xa.toFixed(2)} />
-        <StatTile label="Shots" value={player.shots} />
-        <StatTile label="Shots on Target" value={player.shotsOnTarget} />
-        <StatTile label="Shots off Target" value={player.shotsOffTarget} />
-        <StatTile label="Blocked Shots" value={player.blockedShots} />
-        <StatTile
-          label="Shot Accuracy"
-          value={player.shotAccuracy || '—'}
-        />
-        <StatTile
-          label="Accurate Passes"
-          value={player.accuratePasses || '—'}
-        />
-        <StatTile label="Chances Created" value={player.chancesCreated} />
-        <StatTile label="Big Chances" value={player.bigChancesCreated} />
-        <StatTile
-          label="Defensive Contributions"
-          value={player.defensiveContributions}
-        />
-      </StatGroup>
-
-      <StatGroup title="Attack" tone="blue">
-        <StatTile label="Touches" value={player.touches} />
-        <StatTile
-          label="Touches in Opp Box"
-          value={player.touchesOppBox}
-        />
-        <StatTile
-          label="Successful Dribbles"
-          value={player.successfulDribbles || '—'}
-        />
-        <StatTile
-          label="Passes into Final Third"
-          value={player.passesFinalThird}
-        />
-        <StatTile
-          label="Accurate Crosses"
-          value={player.accurateCrosses || '—'}
-        />
-        <StatTile label="Corners" value={player.corners} />
-        <StatTile label="Dispossessed" value={player.dispossessed} />
-      </StatGroup>
-
-      <StatGroup title="Duels" tone="blue">
-        <StatTile
-          label="Ground Duels Won"
-          value={player.groundDuelsWon || '—'}
-        />
-        <StatTile
-          label="Aerial Duels Won"
-          value={player.aerialDuelsWon || '—'}
-        />
-        <StatTile label="Was Fouled" value={player.wasFouled} />
-        <StatTile label="Fouls Committed" value={player.foulsCommitted} />
-      </StatGroup>
-
-      <StatGroup title="Defense" tone="blue">
-        <StatTile label="Tackles" value={player.tackles} />
-        <StatTile label="Interceptions" value={player.interceptions} />
-        <StatTile label="Recoveries" value={player.recoveries} />
-        <StatTile label="Dribbled Past" value={player.dribbledPast} />
-      </StatGroup>
-
-      <StatGroup
-        title="Off Ball · FieldVision Only"
-        tone="green"
-        footer={
-          <div className="text-xs text-fv-green leading-relaxed border-l-2 border-fv-green pl-3 bg-fv-greenLight rounded-r p-3">
-            These metrics don't exist on Opta, StatsBomb, or Wyscout.
-            Generated by FieldVision computer vision for every player, every
-            game.
-          </div>
-        }
-      >
-        <StatTile
-          label="Off Ball Distance (km)"
-          value={player.offBallDistanceKm.toFixed(1)}
-          variant="fv-only"
-        />
-        <StatTile
-          label="Sprint Distance (m)"
-          value={player.sprintDistanceM.toLocaleString()}
-          variant="fv-only"
-        />
-        <StatTile
-          label="Top Speed (km/h)"
-          value={player.topSpeedKmh.toFixed(1)}
-          variant="fv-only"
-        />
-        <StatTile
-          label="Pressure Events"
-          value={player.pressureEvents}
-          variant="fv-only"
-        />
-        <StatTile
-          label="Runs Creating Chances"
-          value={player.runsCreatingChances}
-          variant="fv-only"
-        />
-        <StatTile
-          label="Space Created /90"
-          value={player.spaceCreatedPer90.toFixed(1)}
-          variant="fv-only"
-        />
-        <StatTile
-          label="Progressive Runs"
-          value={player.progressiveRuns}
-          variant="fv-only"
-        />
-        <StatTile
-          label="Defensive Actions /90"
-          value={player.defensiveActionsPer90.toFixed(1)}
-          variant="fv-only"
-        />
-      </StatGroup>
+    <div className="inline-flex items-center gap-2 rounded-full border border-navy-600 bg-navy-700 px-3 py-1.5">
+      <span className="font-mono text-sm font-bold text-ink-100">{value}</span>
+      <span className="text-[10px] uppercase tracking-widest text-ink-300">{label}</span>
     </div>
   )
 }
 
-function PerGameTab({
+function RatingTile({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border border-navy-600 bg-navy-700 px-4 py-2 text-center">
+      <div className="font-mono text-2xl font-bold leading-none text-ink-100">{value}</div>
+      <div className="mt-1 text-[10px] uppercase tracking-widest text-ink-300">{label}</div>
+    </div>
+  )
+}
+
+function OverviewTab({
   player,
-  perGame,
+  fits,
+  percentiles,
 }: {
   player: PlayerType
-  perGame: PerGameStats[]
+  fits: RoleFit[]
+  percentiles: Percentiles
 }) {
-  if (perGame.length === 0) {
-    return (
-      <EmptyState
-        icon={Calendar}
-        title="Per game breakdowns coming soon"
-        description={`Per game data is currently available for: Elan Romo (#9). Other players will be backfilled before the next season starts.`}
-      />
-    )
-  }
-
-  const bestRating = Math.max(...perGame.map((g) => g.fvRating))
+  const { universe } = useUniverse()
+  const compareRole = fits[0]?.role
 
   return (
-    <div className="bg-navy-800 rounded-lg border border-navy-600 overflow-hidden">
-      <div className="px-6 py-4 border-b border-navy-600 flex items-center justify-between">
-        <div>
-          <h2 className="section-label text-blue-500">
-            Per Game · {player.name}
-          </h2>
-          <div className="text-xs text-ink-300 mt-1">
-            {perGame.length} games · Best rating {bestRating.toFixed(1)}
-          </div>
-        </div>
-      </div>
-      <div className="overflow-auto scrollbar-thin">
-        <table className="w-full text-sm border-collapse">
-          <thead className="sticky top-0 bg-navy-700">
-            <tr className="text-[11px] uppercase tracking-widest text-ink-300">
-              <th className="px-3 py-2.5 text-left font-semibold">Game</th>
-              <th className="px-3 py-2.5 text-left font-semibold">Date</th>
-              <th className="px-3 py-2.5 text-left font-semibold">Opponent</th>
-              <th className="px-3 py-2.5 text-left font-semibold">Result</th>
-              <th className="px-3 py-2.5 text-right font-semibold">Min</th>
-              <th className="px-3 py-2.5 text-right font-semibold">G</th>
-              <th className="px-3 py-2.5 text-right font-semibold">A</th>
-              <th className="px-3 py-2.5 text-right font-semibold">Shots</th>
-              <th className="px-3 py-2.5 text-right font-semibold">SoT</th>
-              <th className="px-3 py-2.5 text-right font-semibold">xG</th>
-              <th className="px-3 py-2.5 text-right font-semibold">xA</th>
-              <th className="px-3 py-2.5 text-right font-semibold">Pass%</th>
-              <th className="px-3 py-2.5 text-right font-semibold">Touches</th>
-              <th className="px-3 py-2.5 text-right font-semibold text-fv-green">
-                Off Ball km
-              </th>
-              <th className="px-3 py-2.5 text-right font-semibold text-fv-green">
-                Top Speed
-              </th>
-              <th className="px-3 py-2.5 text-right font-semibold">FV</th>
-            </tr>
-          </thead>
-          <tbody className="font-mono">
-            {perGame.map((g) => {
-              const isBest = g.fvRating === bestRating
-              return (
-                <tr
-                  key={g.game}
-                  className={clsx(
-                    'border-t border-navy-700 hover:bg-navy-700 transition-colors',
-                    isBest && 'border-l-2 border-l-blue-500',
-                  )}
-                >
-                  <td className="px-3 py-2.5 text-ink-300">{g.game}</td>
-                  <td className="px-3 py-2.5 text-ink-300">{g.date}</td>
-                  <td className="px-3 py-2.5 text-white font-sans font-medium">
-                    {g.opponent}
-                  </td>
-                  <td className="px-3 py-2.5 text-ink-100">{g.result}</td>
-                  <td className="px-3 py-2.5 text-right">{g.min}</td>
-                  <td className="px-3 py-2.5 text-right">{g.goals}</td>
-                  <td className="px-3 py-2.5 text-right">{g.assists}</td>
-                  <td className="px-3 py-2.5 text-right">{g.shots}</td>
-                  <td className="px-3 py-2.5 text-right">{g.sot}</td>
-                  <td className="px-3 py-2.5 text-right">
-                    {g.xg.toFixed(2)}
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    {g.xa.toFixed(2)}
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    {g.passPct.toFixed(0)}%
-                  </td>
-                  <td className="px-3 py-2.5 text-right">{g.touches}</td>
-                  <td className="px-3 py-2.5 text-right text-fv-green">
-                    {g.offBallKm.toFixed(1)}
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-fv-green">
-                    {g.topSpeed.toFixed(1)}
-                  </td>
-                  <td
-                    className={clsx(
-                      'px-3 py-2.5 text-right font-bold',
-                      g.fvRating >= 8.0
-                        ? 'text-fv-green'
-                        : g.fvRating < 6.5
-                          ? 'text-fv-red'
-                          : 'text-white',
-                    )}
-                  >
-                    {g.fvRating.toFixed(1)}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-navy-600 bg-navy-800 p-6 shadow-card">
+        <h2 className="section-label mb-5 text-blue-500">Attribute Details</h2>
+        <AttributeBreakdown player={player} />
+      </section>
 
-const CLIP_TYPES = [
-  'Goal',
-  'Assist',
-  'Big Chance',
-  'Tackle',
-  'Pressure',
-  'Progressive Run',
-] as const
+      <RoleFitGrid fits={fits} />
 
-function HighlightsTab({ videoUrl }: { videoUrl?: string }) {
-  const clips = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, i) => ({
-        id: i + 1,
-        type: CLIP_TYPES[i % CLIP_TYPES.length],
-        timestamp: `${(11 + ((i * 7) % 70)).toString().padStart(2, '0')}:${((i * 13) % 60).toString().padStart(2, '0')}`,
-      })),
-    [],
-  )
-
-  return (
-    <div className="space-y-5">
-      {videoUrl ? (
-        <div className="bg-navy-800 rounded-lg border border-navy-600 overflow-hidden">
-          <div className="px-6 py-4 border-b border-navy-600">
-            <h2 className="section-label text-blue-500">Season Highlight Reel</h2>
-            <div className="text-xs text-ink-300 mt-1">
-              Auto compiled from FieldVision tracked clips
-            </div>
-          </div>
-          <div className="aspect-video bg-navy-900">
-            <iframe
-              src={videoUrl}
-              title="Player highlight reel"
-              className="w-full h-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
-          </div>
-        </div>
+      {compareRole ? (
+        <ComparisonList
+          universe={universe}
+          player={player}
+          role={compareRole}
+          percentiles={percentiles}
+        />
       ) : null}
-      <div className="grid grid-cols-3 gap-4">
-        {clips.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => console.log('clip clicked', c.id)}
-            className="group relative aspect-video bg-navy-700 rounded-md border border-navy-600 hover:border-blue-500 transition-colors overflow-hidden"
-          >
-            <div className="absolute inset-0 flex items-center justify-center">
-              <PlayCircle
-                size={40}
-                strokeWidth={1.25}
-                className="text-white opacity-80 group-hover:opacity-100 transition-opacity"
-              />
-            </div>
-            <div className="absolute bottom-2 left-2 px-2 py-0.5 text-[10px] uppercase tracking-widest font-semibold bg-navy-900/80 text-blue-400 rounded">
-              {c.type}
-            </div>
-            <div className="absolute bottom-2 right-2 px-2 py-0.5 text-[10px] font-mono bg-navy-900/80 text-white rounded">
-              {c.timestamp}
-            </div>
-          </button>
-        ))}
-      </div>
-      <div className="text-center text-xs text-fv-green border-l-2 border-fv-green pl-3 bg-fv-greenLight p-3 rounded-r">
-        247 clips auto generated this season. Every touch tracked and tagged
-        by FieldVision computer vision. No manual editing.
-      </div>
     </div>
   )
 }
 
-function CompareTab({
-  player,
-  allPlayers,
-}: {
-  player: PlayerType
-  allPlayers: PlayerType[]
-}) {
-  const others = allPlayers.filter((p) => p.slug !== player.slug)
-  const defaultOther =
-    allPlayers.find((p) => p.slug === 'aidan-chuang') ?? others[0]
-  const [otherSlug, setOtherSlug] = useState(defaultOther?.slug ?? '')
-  const other = allPlayers.find((p) => p.slug === otherSlug)
+function StatisticsTab({ player }: { player: PlayerType }) {
+  const groups = useMemo(() => groupedStats(player), [player])
 
-  if (!other) {
-    return (
-      <EmptyState
-        title="No comparison available"
-        description="Need at least one other player on the roster."
-      />
-    )
+  return (
+    <div className="space-y-6">
+      {GROUP_ORDER.map((groupName) => {
+        const defs = groups[groupName]
+        if (!defs || !defs.length) return null
+        return (
+          <section key={groupName} className="rounded-2xl border border-navy-600 bg-navy-800 p-6 shadow-card">
+            <div className="mb-4 flex items-center gap-2">
+              <h2 className="section-label text-blue-500">{groupName}</h2>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {defs.map((def) => (
+                <StatTile
+                  key={def.key}
+                  label={def.label}
+                  value={def.format(def.get(player))}
+                />
+              ))}
+            </div>
+          </section>
+        )
+      })}
+    </div>
+  )
+}
+
+function groupedStats(player: PlayerType): Partial<Record<StatGroupName, StatDef[]>> {
+  const isGk = player.positionGroup === 'GK'
+  const result: Partial<Record<StatGroupName, StatDef[]>> = {}
+  for (const def of STAT_CATALOG) {
+    if (def.scope === 'gk' && !isGk) continue
+    if (def.scope === 'outfield' && isGk) continue
+    const list = result[def.group] ?? []
+    list.push(def)
+    result[def.group] = list
+  }
+  return result
+}
+
+function MatchLogTab({ player }: { player: PlayerType }) {
+  const { universe } = useUniverse()
+  const [selected, setSelected] = useState<PlayerMatchStat | null>(null)
+  const matches = useMemo(
+    () => [...player.matches].sort((a, b) => a.date.localeCompare(b.date)),
+    [player.matches],
+  )
+
+  if (!matches.length) {
+    return <EmptyState title="No match data" description="This player has no logged appearances." />
   }
 
-  const stats: Array<{
-    label: string
-    key: keyof PlayerType
-    decimals?: number
-  }> = [
-    { label: 'Goals', key: 'goals' },
-    { label: 'Assists', key: 'assists' },
-    { label: 'xG', key: 'xg', decimals: 2 },
-    { label: 'xA', key: 'xa', decimals: 2 },
-    { label: 'Shots', key: 'shots' },
-    { label: 'Chances Created', key: 'chancesCreated' },
-    { label: 'Touches', key: 'touches' },
-    { label: 'Touches Opp Box', key: 'touchesOppBox' },
-    { label: 'Tackles', key: 'tackles' },
-    { label: 'Interceptions', key: 'interceptions' },
-    { label: 'Off Ball Distance (km)', key: 'offBallDistanceKm', decimals: 1 },
-    { label: 'Top Speed (km/h)', key: 'topSpeedKmh', decimals: 1 },
-    { label: 'Pressure Events', key: 'pressureEvents' },
-    { label: 'Progressive Runs', key: 'progressiveRuns' },
-    { label: 'FV Rating', key: 'fvRating', decimals: 1 },
-  ]
+  const trendData = matches.map((m) => ({ label: dateLabel(m.date), rating: m.rating }))
+  const bestRating = Math.max(...matches.map((m) => m.rating))
+  const selectedOpponent = selected ? getTeam(universe, selected.opponentTeamId) : undefined
 
-  function formatValue(p: PlayerType, s: (typeof stats)[number]) {
-    const v = p[s.key]
-    if (typeof v === 'number') {
-      return s.decimals ? v.toFixed(s.decimals) : v.toString()
-    }
-    return String(v)
+  return (
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-navy-600 bg-navy-800 p-6 shadow-card">
+        <h2 className="section-label mb-4 text-blue-500">FV Rating Trend</h2>
+        <div className="h-[240px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={trendData} margin={{ top: 8, right: 16, bottom: 0, left: -16 }}>
+              <CartesianGrid stroke="#E7E9EC" strokeDasharray="3 3" />
+              <XAxis dataKey="label" tick={{ fill: '#646B76', fontSize: 11 }} axisLine={{ stroke: '#D6D9DE' }} />
+              <YAxis domain={[4, 10]} tick={{ fill: '#9AA0AA', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip
+                contentStyle={{
+                  background: '#FFFFFF',
+                  border: '1px solid #E7E9EC',
+                  borderRadius: 8,
+                  color: '#16191E',
+                  fontSize: 12,
+                  boxShadow: '0 12px 32px -10px rgba(16, 24, 40, 0.16)',
+                }}
+              />
+              <Line type="monotone" dataKey="rating" stroke="#2563EB" strokeWidth={2.5} dot={{ r: 3, fill: '#2563EB' }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-navy-600 bg-navy-800 shadow-card">
+        <div className="border-b border-navy-600 px-5 py-3">
+          <h2 className="section-label text-blue-500">Per Match Log</h2>
+          <div className="mt-1 text-xs text-ink-300">
+            {matches.length} appearances · Best rating {bestRating.toFixed(1)} · Click a match for the
+            full breakdown
+          </div>
+        </div>
+        <div className="scrollbar-thin overflow-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead className="sticky top-0 bg-navy-700">
+              <tr className="text-[11px] uppercase tracking-widest text-ink-300">
+                <th className="px-3 py-2.5 text-left font-semibold">Date</th>
+                <th className="px-3 py-2.5 text-left font-semibold">Opponent</th>
+                <th className="px-3 py-2.5 text-right font-semibold">Min</th>
+                <th className="px-3 py-2.5 text-right font-semibold">G</th>
+                <th className="px-3 py-2.5 text-right font-semibold">A</th>
+                <th className="px-3 py-2.5 text-right font-semibold">Sh</th>
+                <th className="px-3 py-2.5 text-right font-semibold">xG</th>
+                <th className="px-3 py-2.5 text-right font-semibold">FV</th>
+                <th className="px-3 py-2.5" aria-label="Open match" />
+              </tr>
+            </thead>
+            <tbody className="font-mono">
+              {matches.map((m) => {
+                const opponent = getTeam(universe, m.opponentTeamId)
+                return (
+                  <tr
+                    key={m.matchId}
+                    onClick={() => setSelected(m)}
+                    className="group cursor-pointer border-t border-navy-700 transition-colors hover:bg-navy-700"
+                  >
+                    <td className="px-3 py-2.5 text-ink-300">{dateLabel(m.date)}</td>
+                    <td className="px-3 py-2.5">
+                      {opponent ? (
+                        <span className="inline-flex items-center gap-2 font-sans text-ink-100">
+                          <TeamCrest team={opponent} size="xs" />
+                          {opponent.shortName}
+                        </span>
+                      ) : (
+                        <span className="font-sans text-ink-100">{m.opponentTeamId}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-ink-100">{m.minutes}</td>
+                    <td className="px-3 py-2.5 text-right text-ink-100">{m.goals}</td>
+                    <td className="px-3 py-2.5 text-right text-ink-100">{m.assists}</td>
+                    <td className="px-3 py-2.5 text-right text-ink-100">{m.shots}</td>
+                    <td className="px-3 py-2.5 text-right text-ink-100">{m.xg.toFixed(2)}</td>
+                    <td className="px-3 py-2.5 text-right">
+                      <RatingBadge rating={m.rating} size="sm" />
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      <ChevronRight
+                        size={16}
+                        className="ml-auto text-ink-300 transition-colors group-hover:text-blue-500"
+                      />
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {selected ? (
+        <MatchDetailModal
+          player={player}
+          match={selected}
+          opponent={selectedOpponent}
+          onClose={() => setSelected(null)}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+// One every touch video per match the player featured in. Each card is titled
+// "{Player} vs {Opponent}" so a coach can pull up a full game of touches in one
+// click rather than a grid of disconnected clips.
+function VideoTab({ player }: { player: PlayerType }) {
+  const { universe } = useUniverse()
+  const matches = useMemo(
+    () => [...player.matches].sort((a, b) => b.date.localeCompare(a.date)),
+    [player.matches],
+  )
+
+  if (!matches.length) {
+    return <EmptyState title="No video" description="This player has no logged appearances yet." />
   }
-
-  const columns = [player, other]
 
   return (
     <div className="space-y-5">
-      <div className="bg-navy-800 rounded-lg border border-navy-600 p-5 flex items-center gap-5">
-        <div className="text-xs uppercase tracking-widest text-ink-300">
-          Compare with
-        </div>
-        <select
-          value={otherSlug}
-          onChange={(e) => setOtherSlug(e.target.value)}
-          className="bg-navy-900 border border-navy-600 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-        >
-          {others.map((p) => (
-            <option key={p.slug} value={p.slug}>
-              {p.name} · #{p.number} · {p.position}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="grid grid-cols-2 gap-5">
-        {columns.map((p, idx) => {
-          const opp = columns[1 - idx]!
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        {matches.map((m) => {
+          const opponent = getTeam(universe, m.opponentTeamId)
+          const opponentName = opponent ? opponent.shortName : m.opponentTeamId
           return (
-            <div
-              key={p.slug}
-              className="bg-navy-800 rounded-lg border border-navy-600 p-6"
+            <button
+              key={m.matchId}
+              type="button"
+              className="group relative aspect-video overflow-hidden rounded-xl border border-navy-600 bg-gradient-to-br from-slate-700 to-slate-900 shadow-card transition-colors hover:border-blue-500"
             >
-              <div className="flex items-center gap-3 mb-5">
-                <PlayerAvatar name={p.name} size="lg" />
-                <div className="min-w-0">
-                  <div className="text-base font-bold text-white truncate">
-                    {p.name}
-                  </div>
-                  <div className="text-xs text-ink-300 font-mono">
-                    #{p.number} · {p.position} · {p.year}
-                  </div>
-                </div>
-                <div className="ml-auto">
-                  <RatingBadge rating={p.fvRating} size="lg" />
-                </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <PlayCircle
+                  size={40}
+                  strokeWidth={1.25}
+                  className="text-white opacity-80 transition-opacity group-hover:opacity-100"
+                />
               </div>
-
-              <div className="space-y-2">
-                {stats.map((s) => {
-                  const mine = Number(p[s.key])
-                  const theirs = Number(opp[s.key])
-                  const isHigher = mine > theirs
-                  const isLower = mine < theirs
-                  return (
-                    <div
-                      key={String(s.key)}
-                      className={clsx(
-                        'flex items-center justify-between px-3 py-2 rounded-md border-l-2 bg-navy-700',
-                        isHigher && 'border-fv-green',
-                        isLower && 'border-fv-red',
-                        !isHigher && !isLower && 'border-navy-600',
-                      )}
-                    >
-                      <span className="text-xs uppercase tracking-widest text-ink-300">
-                        {s.label}
-                      </span>
-                      <span className="font-mono text-sm font-bold text-white tabular-nums">
-                        {formatValue(p, s)}
-                      </span>
-                    </div>
-                  )
-                })}
+              <div className="absolute left-2 top-2 rounded bg-black/50 px-2 py-0.5 font-mono text-[10px] text-white">
+                {dateLabel(m.date)}
               </div>
-            </div>
+              <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2">
+                <span className="truncate rounded bg-black/50 px-2 py-0.5 text-[11px] font-semibold text-white">
+                  {player.firstName} vs {opponentName}
+                </span>
+                <span className="rounded bg-black/50 px-2 py-0.5 font-mono text-[10px] text-white">
+                  {m.minutes}'
+                </span>
+              </div>
+            </button>
           )
         })}
+      </div>
+      <div className="rounded-r border-l-2 border-fv-green bg-fv-greenLight p-3 text-center text-xs text-fv-green">
+        Every touch video for each game this season. Tracked and tagged by FieldVision computer
+        vision so you see everything in one place.
       </div>
     </div>
   )

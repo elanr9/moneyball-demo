@@ -13,7 +13,7 @@ interface TabsProps {
 
 export function Tabs({ tabs, active, onChange }: TabsProps) {
   return (
-    <div className="border-b border-navy-600 flex">
+    <div className="flex border-b border-navy-600">
       {tabs.map((tab) => {
         const isActive = tab.id === active
         return (
@@ -22,13 +22,17 @@ export function Tabs({ tabs, active, onChange }: TabsProps) {
             type="button"
             onClick={() => onChange(tab.id)}
             className={clsx(
-              'px-4 py-3 text-sm font-medium border-b-2 transition-colors',
-              isActive
-                ? 'text-blue-400 border-blue-500'
-                : 'text-ink-300 border-transparent hover:text-white',
+              'relative px-4 py-3 text-sm font-semibold transition-colors duration-200',
+              isActive ? 'text-ink-100' : 'text-ink-300 hover:text-ink-100',
             )}
           >
             {tab.label}
+            <span
+              className={clsx(
+                'absolute inset-x-3 -bottom-px h-0.5 rounded-full transition-all duration-200',
+                isActive ? 'bg-team opacity-100' : 'opacity-0',
+              )}
+            />
           </button>
         )
       })}
