@@ -162,6 +162,199 @@
   animation: fv-sheen 2.6s ease-in-out 0.6s both;
 }
 
+/* Cinematic opener. A slow grand reveal on a deep canvas where every element
+   materializes out of light and blur, then the whole scene dissolves into the
+   product. Each stage is its own animation so timing reads like a title card. */
+
+/* The whole canvas eases in from a slight overscale so the world settles. */
+@keyframes fv-cine-canvas {
+  0% {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.fv-cine-canvas {
+  animation: fv-cine-canvas 1.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* A vast slow aurora drifting behind everything to feel alive and ambient. */
+@keyframes fv-cine-aurora {
+  0% {
+    transform: translate3d(-6%, -4%, 0) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate3d(6%, 5%, 0) scale(1.15);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate3d(-6%, -4%, 0) scale(1);
+    opacity: 0.55;
+  }
+}
+
+.fv-cine-aurora {
+  animation: fv-cine-aurora 16s ease-in-out infinite;
+}
+
+/* A faint depth grid that drifts upward forever, masked to the center. */
+@keyframes fv-cine-grid {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 0 -64px;
+  }
+}
+
+.fv-cine-grid {
+  background-image:
+    linear-gradient(to right, rgba(61, 125, 255, 0.09) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(61, 125, 255, 0.09) 1px, transparent 1px);
+  background-size: 64px 64px;
+  animation: fv-cine-grid 9s linear infinite;
+  mask-image: radial-gradient(circle at center, black 0%, transparent 68%);
+  -webkit-mask-image: radial-gradient(circle at center, black 0%, transparent 68%);
+}
+
+/* The brand mark builds from a small blurred point of light into focus. */
+@keyframes fv-cine-logo {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
+    filter: blur(16px);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+.fv-cine-logo {
+  animation: fv-cine-logo 1.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* A breathing halo of light around the mark once it has landed. */
+@keyframes fv-cine-halo {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.25);
+  }
+}
+
+.fv-cine-halo {
+  animation: fv-cine-halo 4.5s ease-in-out infinite;
+}
+
+/* Each word of the headline rises out of blur on its own beat. */
+@keyframes fv-cine-word {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+    filter: blur(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.fv-cine-word {
+  display: inline-block;
+  animation: fv-cine-word 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* A luminous divider that draws itself out from the center. */
+@keyframes fv-cine-line {
+  0% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+.fv-cine-line {
+  transform-origin: center;
+  animation: fv-cine-line 1.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* General slow lift used for the tagline and the invitation. */
+@keyframes fv-cine-up {
+  0% {
+    opacity: 0;
+    transform: translateY(24px);
+    filter: blur(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.fv-cine-up {
+  animation: fv-cine-up 1.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Slow embers of light rising through the scene. */
+@keyframes fv-cine-float {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.7;
+  }
+  85% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(-160px) scale(1.4);
+    opacity: 0;
+  }
+}
+
+.fv-cine-float {
+  animation: fv-cine-float 11s ease-in-out infinite;
+}
+
+/* A single wide beam of light sweeping across the title once. */
+@keyframes fv-cine-beam {
+  0% {
+    transform: translateX(-70%) rotate(10deg);
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateX(70%) rotate(10deg);
+    opacity: 0;
+  }
+}
+
+.fv-cine-beam {
+  animation: fv-cine-beam 3.4s ease-in-out 1s both;
+}
+
 /* Tutorial spotlight ring. A gentle breathing halo around the highlighted part
    so the eye lands on it without anything aggressive. */
 @keyframes fv-tour-ring {
